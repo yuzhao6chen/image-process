@@ -1,0 +1,9 @@
+.env
+input/
+output/
+output2/
+project_output/
+.work/
+tmp/
+__pycache__/
+*.py[cod]

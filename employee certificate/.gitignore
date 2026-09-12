@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+.employee_extraction_state.json
+员工证书结果/
+其他文档结果/
+处理失败结果/

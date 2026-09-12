@@ -1,0 +1,358 @@
+{
+  "source_file": "项目爬取关键字段20260622.xlsx",
+  "source_sha256": "6eb1658c6fbbdd2acc6eab17a2cdd360fa804a566146466463a2dc38121087bc",
+  "available_sheets": [
+    "招标计划",
+    "资格预审公告",
+    "招标公告",
+    "中标候选人公示",
+    "定标候选人公示",
+    "中标结果公示",
+    "更正结果公示",
+    "合同与履约"
+  ],
+  "selected_sheet": "招标公告",
+  "row_count": 36,
+  "unique_name_count": 35,
+  "warnings": [
+    "字段名称重复；保留每一来源行，不按名称覆盖。",
+    "原表序号重复；使用工作表名和行号作为唯一标识。",
+    "招标公告表含‘预审文件获取时间’，不得自动当作‘招标文件获取时间’。"
+  ],
+  "sheet_notes": [
+    {
+      "source_row": 38,
+      "values": [
+        "备注：全部内容都为关键信息，如有附件需将附件也同步获取。",
+        null,
+        null
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "field_id": "招标公告:row:2",
+      "field_name": "项目性质",
+      "source_sheet": "招标公告",
+      "source_row": 2,
+      "source_number": 1,
+      "source_note": "依法/非依法",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:3",
+      "field_name": "项目名称",
+      "source_sheet": "招标公告",
+      "source_row": 3,
+      "source_number": 2,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:4",
+      "field_name": "所属行业",
+      "source_sheet": "招标公告",
+      "source_row": 4,
+      "source_number": 3,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:5",
+      "field_name": "组织形式",
+      "source_sheet": "招标公告",
+      "source_row": 5,
+      "source_number": 4,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:6",
+      "field_name": "开标时间",
+      "source_sheet": "招标公告",
+      "source_row": 6,
+      "source_number": 5,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:7",
+      "field_name": "项目编号/招标编号",
+      "source_sheet": "招标公告",
+      "source_row": 7,
+      "source_number": 6,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:8",
+      "field_name": "项目类型/行业分类",
+      "source_sheet": "招标公告",
+      "source_row": 8,
+      "source_number": 7,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:9",
+      "field_name": "项目总投资/估算金额",
+      "source_sheet": "招标公告",
+      "source_row": 9,
+      "source_number": 8,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:10",
+      "field_name": "招标金额",
+      "source_sheet": "招标公告",
+      "source_row": 10,
+      "source_number": 9,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:11",
+      "field_name": "资金来源",
+      "source_sheet": "招标公告",
+      "source_row": 11,
+      "source_number": 10,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:12",
+      "field_name": "项目地点",
+      "source_sheet": "招标公告",
+      "source_row": 12,
+      "source_number": 11,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:13",
+      "field_name": "招标人/采购人名称",
+      "source_sheet": "招标公告",
+      "source_row": 13,
+      "source_number": 13,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:14",
+      "field_name": "招标代理机构",
+      "source_sheet": "招标公告",
+      "source_row": 14,
+      "source_number": 14,
+      "source_note": "",
+      "duplicate_name": true
+    },
+    {
+      "field_id": "招标公告:row:15",
+      "field_name": "项目规模",
+      "source_sheet": "招标公告",
+      "source_row": 15,
+      "source_number": 15,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:16",
+      "field_name": "工期/服务期/供货日期",
+      "source_sheet": "招标公告",
+      "source_row": 16,
+      "source_number": 16,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:17",
+      "field_name": "质量要求",
+      "source_sheet": "招标公告",
+      "source_row": 17,
+      "source_number": 17,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:18",
+      "field_name": "招标内容与范围",
+      "source_sheet": "招标公告",
+      "source_row": 18,
+      "source_number": 18,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:19",
+      "field_name": "申请人资格要求/投标人资格要求",
+      "source_sheet": "招标公告",
+      "source_row": 19,
+      "source_number": 19,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:20",
+      "field_name": "预审文件获取时间",
+      "source_sheet": "招标公告",
+      "source_row": 20,
+      "source_number": 20,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:21",
+      "field_name": "获取方式",
+      "source_sheet": "招标公告",
+      "source_row": 21,
+      "source_number": 18,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:22",
+      "field_name": "递交截止时间",
+      "source_sheet": "招标公告",
+      "source_row": 22,
+      "source_number": 19,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:23",
+      "field_name": "递交方法",
+      "source_sheet": "招标公告",
+      "source_row": 23,
+      "source_number": 20,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:24",
+      "field_name": "开启时间",
+      "source_sheet": "招标公告",
+      "source_row": 24,
+      "source_number": 21,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:25",
+      "field_name": "开启方式",
+      "source_sheet": "招标公告",
+      "source_row": 25,
+      "source_number": 22,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:26",
+      "field_name": "开启地点",
+      "source_sheet": "招标公告",
+      "source_row": 26,
+      "source_number": 23,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:27",
+      "field_name": "评审办法",
+      "source_sheet": "招标公告",
+      "source_row": 27,
+      "source_number": 24,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:28",
+      "field_name": "投标保证金方式",
+      "source_sheet": "招标公告",
+      "source_row": 28,
+      "source_number": 25,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:29",
+      "field_name": "招标人地址",
+      "source_sheet": "招标公告",
+      "source_row": 29,
+      "source_number": 26,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:30",
+      "field_name": "招标人联系人",
+      "source_sheet": "招标公告",
+      "source_row": 30,
+      "source_number": 27,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:31",
+      "field_name": "招标人联系方式",
+      "source_sheet": "招标公告",
+      "source_row": 31,
+      "source_number": 28,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:32",
+      "field_name": "招标代理机构",
+      "source_sheet": "招标公告",
+      "source_row": 32,
+      "source_number": 29,
+      "source_note": "",
+      "duplicate_name": true
+    },
+    {
+      "field_id": "招标公告:row:33",
+      "field_name": "招标代理机构地址",
+      "source_sheet": "招标公告",
+      "source_row": 33,
+      "source_number": 30,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:34",
+      "field_name": "招标代理机构联系人",
+      "source_sheet": "招标公告",
+      "source_row": 34,
+      "source_number": 31,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:35",
+      "field_name": "招标代理机构联系方式",
+      "source_sheet": "招标公告",
+      "source_row": 35,
+      "source_number": 32,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:36",
+      "field_name": "发布日期",
+      "source_sheet": "招标公告",
+      "source_row": 36,
+      "source_number": 33,
+      "source_note": "",
+      "duplicate_name": false
+    },
+    {
+      "field_id": "招标公告:row:37",
+      "field_name": "发布网站",
+      "source_sheet": "招标公告",
+      "source_row": 37,
+      "source_number": 34,
+      "source_note": "",
+      "duplicate_name": false
+    }
+  ]
+}

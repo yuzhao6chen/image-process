@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "company-tender-profile/v2",
+  "title": "投标文件新企业画像初始化候选包",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operation",
+    "companyId",
+    "run",
+    "sourceDocument",
+    "subjectCompany",
+    "creationReadiness",
+    "pageManifestSummary",
+    "companyCreateCandidate",
+    "aliases",
+    "qualifications",
+    "intellectualProperties",
+    "financialHistory",
+    "riskAndCompliance",
+    "personnelHistory",
+    "performances",
+    "customerRelationships",
+    "productsAndEquipment",
+    "solutionClaims",
+    "deliveryClaims",
+    "customerAndRegionExperience",
+    "bidSpecific",
+    "capabilityEvidence",
+    "capabilityAssessments",
+    "derivedProfileCandidates",
+    "profileProjectionCandidate",
+    "serverTargetContract",
+    "evidence",
+    "conflicts",
+    "sensitiveFindings",
+    "quality"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "company-tender-profile/v2"},
+    "operation": {"const": "CREATE_COMPANY"},
+    "companyId": {"type": "null"},
+    "run": {"type": "object"},
+    "sourceDocument": {
+      "type": "object",
+      "required": ["fileName", "sha256", "sizeBytes", "mimeType", "totalPages"],
+      "properties": {
+        "fileName": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sizeBytes": {"type": "integer", "minimum": 1},
+        "mimeType": {"const": "application/pdf"},
+        "totalPages": {"type": "integer", "minimum": 1},
+        "encrypted": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    },
+    "subjectCompany": {"type": "object"},
+    "creationReadiness": {
+      "type": "object",
+      "required": ["status", "duplicateCheckStatus", "blockingIssues"],
+      "properties": {
+        "status": {"enum": ["IDENTITY_INCOMPLETE", "NEEDS_REVIEW", "READY_FOR_DUPLICATE_CHECK"]},
+        "duplicateCheckStatus": {"const": "NOT_RUN"},
+        "blockingIssues": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "pageManifestSummary": {"type": "object"},
+    "companyCreateCandidate": {"type": "object"},
+    "aliases": {"type": "array", "items": {"type": "object"}},
+    "qualifications": {"type": "array", "items": {"type": "object"}},
+    "intellectualProperties": {"type": "array", "items": {"type": "object"}},
+    "financialHistory": {"type": "array", "items": {"type": "object"}},
+    "riskAndCompliance": {"type": "array", "items": {"type": "object"}},
+    "personnelHistory": {"type": "array", "items": {"type": "object"}},
+    "performances": {"type": "array", "items": {"type": "object"}},
+    "customerRelationships": {"type": "array", "items": {"type": "object"}},
+    "productsAndEquipment": {"type": "array", "items": {"type": "object"}},
+    "solutionClaims": {"type": "array", "items": {"type": "object"}},
+    "deliveryClaims": {"type": "array", "items": {"type": "object"}},
+    "customerAndRegionExperience": {"type": "object"},
+    "bidSpecific": {"type": "object"},
+    "capabilityEvidence": {"type": "array", "items": {"type": "object"}},
+    "capabilityAssessments": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {"type": "object"}
+    },
+    "derivedProfileCandidates": {"type": "object"},
+    "profileProjectionCandidate": {
+      "type": "object",
+      "required": ["operation", "companyId", "fieldCandidates", "entityCandidates", "blockedCandidates"],
+      "properties": {
+        "operation": {"const": "CREATE_COMPANY"},
+        "companyId": {"type": "null"},
+        "fieldCandidates": {"type": "array", "items": {"$ref": "#/$defs/fieldCandidate"}},
+        "entityCandidates": {"type": "object"},
+        "blockedCandidates": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": true
+    },
+    "serverTargetContract": {"type": "object"},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+    "conflicts": {"type": "array", "items": {"type": "object"}},
+    "sensitiveFindings": {"type": "array", "items": {"type": "object"}},
+    "quality": {"type": "object"}
+  },
+  "$defs": {
+    "fieldCandidate": {
+      "type": "object",
+      "required": ["fieldCode", "value", "verificationStatus", "sourceTypeCandidate", "sourceRef", "evidenceRefs"],
+      "properties": {
+        "fieldCode": {"type": "string", "minLength": 1},
+        "value": {},
+        "verificationStatus": {"const": "UNVERIFIED"},
+        "sourceTypeCandidate": {"enum": ["DOCUMENT_AI", "DERIVED"]},
+        "sourceRef": {"type": "string", "minLength": 1},
+        "evidenceRefs": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["evidenceId", "physicalPage", "fieldPath", "sourceText", "sourceStrength"],
+      "properties": {
+        "evidenceId": {"type": "string", "minLength": 1},
+        "physicalPage": {"type": "integer", "minimum": 1},
+        "fieldPath": {"type": "string", "minLength": 1},
+        "sourceText": {"type": "string", "minLength": 1},
+        "sourceStrength": {"enum": ["A", "B", "C", "D"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

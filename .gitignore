@@ -1,0 +1,23 @@
+# 导入预览、批准记录和结果含企业/人员资料，仅保存在本地。
+import-output/
+# 密钥和本地配置
+.env
+.env.*
+!.env.example
+
+# 输入、缓存和运行结果
+input/
+.work/
+.trash/
+output/
+output2/
+project_output/
+import-output/
+tmp/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 本地压缩备份
+*.zip
