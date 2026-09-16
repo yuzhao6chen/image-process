@@ -15,12 +15,13 @@ from jsonschema import validate
 from src.document import Document
 from src.fields import extract_fields, finalize
 from src.qualifications import extract as extract_qualifications
+from src.qualifications_jcebid import extract as extract_jcebid_qualifications
 from src.schema import schema
 
 
 ROOT = Path(__file__).resolve().parent
 FIELDS_PATH = ROOT / "resources" / "fields.json"
-SCHEMA_VERSION = "0.3.3"
+SCHEMA_VERSION = "0.3.4"
 PARSER_NAME = "pdf-inspector 1.18.0"
 
 
@@ -61,6 +62,16 @@ def verify_evidence(value: Any, nodes_by_id: dict[str, dict[str, Any]]) -> None:
             verify_evidence(item, nodes_by_id)
 
 
+def has_business_value(record: dict[str, Any]) -> bool:
+    """Treat an empty structured qualification container as an empty field."""
+    value = record.get("value")
+    if value is None:
+        return False
+    if record.get("field") == "资格要求结构化项" and isinstance(value, dict):
+        return bool(value.get("raw_text") or value.get("items"))
+    return True
+
+
 def run(pdf: Path, output: Path) -> dict[str, Any]:
     pdf = pdf.expanduser().resolve()
     output = output.expanduser().resolve()
@@ -77,9 +88,22 @@ def run(pdf: Path, output: Path) -> dict[str, Any]:
     parse_seconds = perf_counter() - started_at
     definitions = json.loads(FIELDS_PATH.read_text(encoding="utf-8"))
     records, qualification_clauses, unmapped = extract_fields(document, definitions)
-    qualifications = extract_qualifications(document, qualification_clauses)
+    qualification_candidates = [
+        ("generic", extract_qualifications(document, qualification_clauses)),
+        ("jcebid", extract_jcebid_qualifications(document, qualification_clauses)),
+    ]
+    qualification_profile, qualifications = max(
+        qualification_candidates,
+        key=lambda pair: len(pair[1].get("items", [])),
+    )
+    # The integrated pipeline keeps review metadata and full evidence internally.
+    # The standalone batch export strips those fields only at its database boundary.
+    for item in qualifications.get("items", []):
+        item.setdefault("status", "REVIEW_REQUIRED")
+        item.setdefault("note", "资格结构化项为机器抽取结果，需人工审核。")
+        item.setdefault("review", {"status": "UNREVIEWED", "value": None, "note": ""})
     extensions = [
-        ("资格要求结构化项", qualifications, "field_043"),
+        ("资格要求结构化项", qualifications, "field_042"),
     ]
     for name, value, field_id in extensions:
         record = finalize(name, [])
@@ -105,9 +129,9 @@ def run(pdf: Path, output: Path) -> dict[str, Any]:
         "fields": records,
         "unmapped_identifiers": unmapped,
     }
-    if len(records) != 43 or len({record["field"] for record in records}) != 43:
+    if len(records) != 42 or len({record["field"] for record in records}) != 42:
         raise ValueError(f"招标字段数量或名称不符合 Schema {SCHEMA_VERSION}")
-    if not all(record["value"] is None or record["evidence"] for record in records):
+    if not all(not has_business_value(record) or record["evidence"] for record in records):
         raise ValueError("存在没有证据的非空招标字段")
     verify_evidence(data, {node["item_id"]: node for node in document.items})
     contract = schema([record["field"] for record in records])
@@ -122,8 +146,10 @@ def run(pdf: Path, output: Path) -> dict[str, Any]:
         "statuses": dict(Counter(record["status"] for record in records)),
         "qualification_items": len(qualifications["items"]),
         "qualification_sources": len(qualifications["source_items"]),
+        "qualification_profile": qualification_profile,
         "blank_pages": [page["pdf_page"] for page in document.pages if not page["text"].strip()],
         "sections": document.groups,
+        "section_notes": document.section_notes,
     }
     document.write(output / "report.json", summary)
     return summary

@@ -31,7 +31,11 @@ def stable_hash(*parts: object, length: int | None = None) -> str:
 def atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temporary.write_text(text, encoding="utf-8", newline="\n")
+    # Path.write_text gained the newline argument in Python 3.10.  Keep the
+    # project runnable on Python 3.9, which is still used by the PDF parser
+    # environment declared for this repository.
+    with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+        stream.write(text)
     os.replace(temporary, path)
 
 

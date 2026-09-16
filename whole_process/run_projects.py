@@ -32,7 +32,7 @@ from normalizers import redact_sensitive_text
 SCRIPT_DIR = Path(__file__).resolve().parent
 TENDER_SCRIPT = SCRIPT_DIR / "tender_parser" / "run.py"
 BID_MARKDOWN_SCRIPT = SCRIPT_DIR / "extract_pdf_markdown.py"
-TENDER_SCHEMA_VERSION = "0.3.3"
+TENDER_SCHEMA_VERSION = "0.3.4"
 BID_RAW_SCHEMA_VERSION = "2.0.0"
 BID_PROCESSING_MODE = "auto_then_force_retry"
 SUCCESS_STATUSES = {"SUCCESS", "SUCCESS_WITH_WARNINGS", "SKIPPED"}

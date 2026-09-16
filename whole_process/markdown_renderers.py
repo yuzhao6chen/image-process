@@ -10,7 +10,7 @@ from normalizers import redact_sensitive_text, sanitize_sensitive_output
 
 
 MARKDOWN_SCHEMA_VERSION = "project-document-markdown/v1"
-PIPELINE_VERSION = "unified-project-parser/1.0.0"
+PIPELINE_VERSION = "unified-project-parser/1.1.0"
 
 LABELS = {
     "aliases": "企业别名",

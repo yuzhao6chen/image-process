@@ -1,4 +1,6 @@
-TYPES=['BASIC','PROFESSIONAL_QUALIFICATION','FINANCIAL','CREDIT','PERFORMANCE','PERSONNEL','CONSORTIUM','RELATIONSHIP','OTHER']
+from .qualification_types import QUALIFICATION_TYPES
+
+TYPES=QUALIFICATION_TYPES
 STATUS=['EXTRACTED','MISSING','CONFLICT','REVIEW_REQUIRED']
 
 
@@ -13,7 +15,7 @@ def schema(names):
         'properties':{'canonical_item_id':{'type':'string'},'type':{'enum':TYPES},'name':{'type':'string'},'requirement':{'type':'string','minLength':1},
                       'evidences':{**proof,'minItems':1},'merge_type':{'enum':['EXACT_DUPLICATE','SEMANTIC_DUPLICATE','SUPPLEMENT','NONE']},'review':review}}}}}
     return {'$schema':'https://json-schema.org/draft/2020-12/schema','type':'object','required':['schema_version','source_pdf_sha256','training_ready','fields'],
-       'properties':{'schema_version':{'const':'0.3.3'},'training_ready':{'const':False},'ocr_performed':{'const':False},
+       'properties':{'schema_version':{'const':'0.3.4'},'training_ready':{'const':False},'ocr_performed':{'const':False},
        'fields':{'type':'array','minItems':len(names),'maxItems':len(names),'items':{'type':'object',
           'required':['field','field_id','value','status','page','evidence','candidates','review'],
           'properties':{'field':{'enum':names},'status':{'enum':STATUS},'evidence':proof,'review':review,
