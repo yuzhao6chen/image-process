@@ -10,7 +10,9 @@ from normalizers import redact_sensitive_text, sanitize_sensitive_output
 
 
 MARKDOWN_SCHEMA_VERSION = "project-document-markdown/v1"
-PIPELINE_VERSION = "unified-project-parser/1.0.0"
+PIPELINE_VERSION = "unified-project-parser/1.1.0"
+# The 1.1.0 change is tender-only; keep existing bid/profile resume metadata valid.
+BID_PIPELINE_VERSION = "unified-project-parser/1.0.0"
 
 LABELS = {
     "aliases": "企业别名",
@@ -422,7 +424,7 @@ def render_bid_markdown(
     lines = _front_matter(
         {
             "schema_version": MARKDOWN_SCHEMA_VERSION,
-            "pipeline_version": PIPELINE_VERSION,
+            "pipeline_version": BID_PIPELINE_VERSION,
             "document_type": "bid",
             "project_key": project_key,
             "company_name": company_name,
@@ -520,6 +522,8 @@ def render_project_report(
             item.get("parser_schema_version") or "—",
             item.get("status", "UNKNOWN"),
             item.get("output") or "—",
+            item.get("award_status") or "—",
+            item.get("award_amount") or "—",
             item.get("summary_model") or "—",
             item.get("final_status") or "—",
             item.get("final_output") or "—",
@@ -527,7 +531,20 @@ def render_project_report(
         for item in bids
     ]
     lines.extend(_table(
-        ["公司", "源文件", "SHA256 前缀", "解析器", "Schema", "解析状态", "中间输出", "画像模型", "画像状态", "最终输出"],
+        [
+            "公司",
+            "源文件",
+            "SHA256 前缀",
+            "解析器",
+            "Schema",
+            "解析状态",
+            "中间输出",
+            "中标状态",
+            "中标金额",
+            "画像模型",
+            "画像状态",
+            "最终输出",
+        ],
         bid_rows,
     ) or ["未处理投标文件。"])
     bid_warnings = [
@@ -552,6 +569,7 @@ def render_project_report(
 
 
 __all__ = [
+    "BID_PIPELINE_VERSION",
     "MARKDOWN_SCHEMA_VERSION",
     "PIPELINE_VERSION",
     "render_bid_markdown",

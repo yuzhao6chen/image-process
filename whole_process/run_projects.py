@@ -13,6 +13,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from award_results import (
+    MATCHED,
+    AwardRegistry,
+    AwardResolution,
+    format_award_amount,
+    load_award_registry,
+    normalize_company_name,
+)
 from config import load_local_env
 from deepseek_profile import (
     DeepSeekSettings,
@@ -21,6 +29,7 @@ from deepseek_profile import (
 )
 from io_utils import atomic_write_text, read_json, sha256_file, utc_now_iso
 from markdown_renderers import (
+    BID_PIPELINE_VERSION,
     PIPELINE_VERSION,
     render_bid_markdown,
     render_project_report,
@@ -32,12 +41,15 @@ from normalizers import redact_sensitive_text
 SCRIPT_DIR = Path(__file__).resolve().parent
 TENDER_SCRIPT = SCRIPT_DIR / "tender_parser" / "run.py"
 BID_MARKDOWN_SCRIPT = SCRIPT_DIR / "extract_pdf_markdown.py"
-TENDER_SCHEMA_VERSION = "0.3.3"
+TENDER_SCHEMA_VERSION = "0.3.4"
 BID_RAW_SCHEMA_VERSION = "2.0.0"
 BID_PROCESSING_MODE = "auto_then_force_retry"
 SUCCESS_STATUSES = {"SUCCESS", "SUCCESS_WITH_WARNINGS", "SKIPPED"}
 USABLE_STATUSES = SUCCESS_STATUSES | {"PARTIAL"}
 PROJECT_ID_PATTERN = re.compile(r"[0-9a-fA-F]{32}")
+AWARD_WINNER = "中标公司"
+AWARD_NOT_WINNER = "未中标"
+AWARD_REVIEW_REQUIRED = "中标结果待核验"
 
 
 @dataclass
@@ -53,6 +65,8 @@ class DocumentOutcome:
     final_status: str | None = None
     final_output: str | None = None
     summary_model: str | None = None
+    award_status: str | None = None
+    award_amount: str | None = None
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -69,6 +83,8 @@ class DocumentOutcome:
             "final_status": self.final_status,
             "final_output": self.final_output,
             "summary_model": self.summary_model,
+            "award_status": self.award_status,
+            "award_amount": self.award_amount,
             "warnings": self.warnings,
             "errors": self.errors,
         }
@@ -93,6 +109,12 @@ class ProjectInput:
     errors: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class CompanyAwardDecision:
+    status: str
+    amount: str | None = None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="逐项目解析招投标 PDF，并使用 DeepSeek 将投标 Markdown 生成完整的八维企业画像",
@@ -108,6 +130,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-root", type=Path, default=SCRIPT_DIR / "output", help="最终 Markdown 输出根目录")
     parser.add_argument("--work-root", type=Path, default=SCRIPT_DIR / ".work", help="内部中间结果目录")
+    parser.add_argument(
+        "--award-file",
+        type=Path,
+        default=SCRIPT_DIR / "get project company" / "中标项目汇总表2.xlsx",
+        help="只读中标结果 Excel；匹配异常时仅将企业画像标记为待核验",
+    )
     parser.add_argument(
         "--project",
         action="append",
@@ -359,13 +387,14 @@ def _existing_output_matches(
     path: Path,
     source_hash: str,
     *,
+    pipeline_version: str = PIPELINE_VERSION,
     processing_mode: str | None = None,
     parser_schema_version: str | None = None,
 ) -> bool:
     metadata = _read_front_matter(path)
     base_matches = (
         metadata.get("source_sha256") == source_hash
-        and metadata.get("pipeline_version") == PIPELINE_VERSION
+        and metadata.get("pipeline_version") == pipeline_version
     )
     if not base_matches:
         return False
@@ -378,12 +407,22 @@ def _existing_output_matches(
     )
 
 
+def _tender_output_can_refresh(path: Path, source_hash: str, project_key: str) -> bool:
+    metadata = _read_front_matter(path)
+    return (
+        metadata.get("document_type") == "tender"
+        and metadata.get("source_sha256") == source_hash
+        and metadata.get("project_key") == project_key
+    )
+
+
 def _guard_output(
     path: Path,
     source_hash: str,
     *,
     resume: bool,
     overwrite: bool,
+    pipeline_version: str = PIPELINE_VERSION,
     processing_mode: str | None = None,
     parser_schema_version: str | None = None,
 ) -> bool:
@@ -397,6 +436,7 @@ def _guard_output(
     if resume and _existing_output_matches(
         path,
         source_hash,
+        pipeline_version=pipeline_version,
         processing_mode=processing_mode,
         parser_schema_version=parser_schema_version,
     ):
@@ -498,6 +538,7 @@ def _relative_output(path: Path, project_output: Path) -> str:
 def _publish_tender_markdown(
     *,
     outcome: DocumentOutcome,
+    project_key: str,
     intermediate_project_output: Path,
     final_project_output: Path,
     resume: bool,
@@ -509,13 +550,24 @@ def _publish_tender_markdown(
     if not source_path.is_file():
         raise ValueError("招标解析 Markdown 中间结果不存在")
     final_path = final_project_output / "招标解析.md"
-    skipped = _guard_output(
+    if resume and final_path.exists() and _tender_output_can_refresh(
         final_path,
         outcome.source_sha256,
-        resume=resume,
-        overwrite=overwrite,
+        project_key,
+    ) and not _existing_output_matches(
+        final_path,
+        outcome.source_sha256,
         parser_schema_version=outcome.parser_schema_version,
-    )
+    ):
+        skipped = False
+    else:
+        skipped = _guard_output(
+            final_path,
+            outcome.source_sha256,
+            resume=resume,
+            overwrite=overwrite,
+            parser_schema_version=outcome.parser_schema_version,
+        )
     if not skipped:
         final_project_output.mkdir(parents=True, exist_ok=True)
         atomic_write_text(final_path, source_path.read_text(encoding="utf-8"))
@@ -523,9 +575,126 @@ def _publish_tender_markdown(
     outcome.final_output = _relative_output(final_path, final_project_output)
 
 
+def _company_award_decisions(
+    *,
+    project_key: str,
+    outcomes: list[DocumentOutcome],
+    registry: AwardRegistry,
+) -> tuple[list[CompanyAwardDecision], list[str]]:
+    resolution: AwardResolution = registry.resolve(project_key)
+    errors: list[str] = []
+    decisions: list[CompanyAwardDecision] = []
+
+    if resolution.status != MATCHED or resolution.record is None:
+        message = resolution.message or "中标结果无法确定"
+        errors.append(f"中标结果：{message}")
+        decisions = [CompanyAwardDecision(AWARD_REVIEW_REQUIRED) for _ in outcomes]
+    else:
+        record = resolution.record
+        winner_key = normalize_company_name(record.winner_name or "")
+        amount = format_award_amount(record.amount)
+        for outcome in outcomes:
+            company_key = normalize_company_name(outcome.company_name or "")
+            if company_key and company_key == winner_key:
+                decisions.append(CompanyAwardDecision(AWARD_WINNER, amount or "待核验"))
+            else:
+                decisions.append(CompanyAwardDecision(AWARD_NOT_WINNER))
+
+        if resolution.message:
+            errors.append(f"中标结果：{resolution.message}")
+        if outcomes and not any(item.status == AWARD_WINNER for item in decisions):
+            errors.append(
+                "中标结果：Excel 中标公司“"
+                f"{record.winner_name}”不在本项目已识别的投标公司中，"
+                "未生成对应的中标企业画像"
+            )
+
+    for outcome, decision in zip(outcomes, decisions):
+        outcome.award_status = decision.status
+        outcome.award_amount = decision.amount if decision.status == AWARD_WINNER else None
+    return decisions, errors
+
+
+def _profile_filename(company_name: str, decision: CompanyAwardDecision) -> str:
+    safe_company = _safe_name(company_name)
+    if decision.status == AWARD_WINNER:
+        suffix = f"（中标公司，金额{decision.amount or '待核验'}）"
+    elif decision.status == AWARD_NOT_WINNER:
+        suffix = "（未中标）"
+    else:
+        suffix = "（中标结果待核验）"
+    return f"{safe_company}{suffix}.md"
+
+
+def _is_company_profile_for(
+    path: Path,
+    *,
+    project_key: str,
+    company_name: str,
+) -> bool:
+    metadata = _read_front_matter(path)
+    return (
+        metadata.get("document_type") == "company_profile"
+        and metadata.get("project_key") == project_key
+        and isinstance(metadata.get("company_name"), str)
+        and normalize_company_name(str(metadata["company_name"]))
+        == normalize_company_name(company_name)
+    )
+
+
+def _prepare_profile_output_path(
+    *,
+    final_project_output: Path,
+    project_key: str,
+    company_name: str,
+    decision: CompanyAwardDecision,
+    resume: bool,
+    overwrite: bool,
+) -> tuple[Path, Path | None]:
+    final_path = final_project_output / _profile_filename(company_name, decision)
+    if not final_project_output.is_dir():
+        return final_path, None
+
+    existing_profiles = [
+        path
+        for path in final_project_output.glob("*.md")
+        if path.is_file()
+        and _is_company_profile_for(
+            path,
+            project_key=project_key,
+            company_name=company_name,
+        )
+    ]
+    if len(existing_profiles) > 1:
+        names = "、".join(path.name for path in existing_profiles)
+        raise ValueError(f"同一公司存在多份最终企业画像：{names}")
+
+    existing_path = existing_profiles[0] if existing_profiles else None
+    if final_path.exists() and not _is_company_profile_for(
+        final_path,
+        project_key=project_key,
+        company_name=company_name,
+    ):
+        raise FileExistsError(f"企业画像目标文件名已被其他文档占用：{final_path.name}")
+
+    if existing_path is not None and existing_path != final_path:
+        if final_path.exists():
+            raise ValueError(
+                f"同一公司存在旧、新两份企业画像："
+                f"{existing_path.name}、{final_path.name}"
+            )
+        if not (resume or overwrite):
+            raise FileExistsError(
+                f"企业画像已以旧命名存在：{existing_path.name}；"
+                "请使用 --resume 或 --overwrite 安全更新中标标记"
+            )
+    return final_path, existing_path
+
+
 def _generate_bid_profile(
     *,
     outcome: DocumentOutcome,
+    award_decision: CompanyAwardDecision,
     project_key: str,
     intermediate_project_output: Path,
     final_project_output: Path,
@@ -541,24 +710,36 @@ def _generate_bid_profile(
     source_path = intermediate_project_output / outcome.output
     if not source_path.is_file():
         raise ValueError("投标解析 Markdown 中间结果不存在")
-    final_path = final_project_output / f"{_safe_name(outcome.company_name)}.md"
+    final_path, existing_path = _prepare_profile_output_path(
+        final_project_output=final_project_output,
+        project_key=project_key,
+        company_name=outcome.company_name,
+        decision=award_decision,
+        resume=resume,
+        overwrite=overwrite,
+    )
+    current_path = existing_path or final_path
     processing_mode = profile_processing_mode(settings.model)
-    if resume and final_path.exists() and not _existing_output_matches(
-        final_path,
+    if resume and current_path.exists() and not _existing_output_matches(
+        current_path,
         outcome.source_sha256,
+        pipeline_version=BID_PIPELINE_VERSION,
         processing_mode=processing_mode,
     ):
         skipped = False
     else:
         skipped = _guard_output(
-            final_path,
+            current_path,
             outcome.source_sha256,
             resume=resume,
             overwrite=overwrite,
+            pipeline_version=BID_PIPELINE_VERSION,
             processing_mode=processing_mode,
         )
     outcome.summary_model = settings.model
     if skipped:
+        if current_path != final_path:
+            current_path.replace(final_path)
         outcome.final_status = "SKIPPED"
         outcome.final_output = _relative_output(final_path, final_project_output)
         return
@@ -581,13 +762,16 @@ def _generate_bid_profile(
         company_name=outcome.company_name,
         source_file=outcome.source_file,
         source_sha256=outcome.source_sha256,
-        pipeline_version=PIPELINE_VERSION,
+        pipeline_version=BID_PIPELINE_VERSION,
         cache_dir=cache_dir,
         settings=settings,
         resume=resume,
     )
     final_project_output.mkdir(parents=True, exist_ok=True)
+    # Keep the old label intact if DeepSeek generation or publishing fails.
     atomic_write_text(final_path, result.markdown)
+    if existing_path is not None and existing_path != final_path:
+        existing_path.unlink()
     outcome.final_status = "SUCCESS"
     outcome.final_output = _relative_output(final_path, final_project_output)
     outcome.summary_model = result.model
@@ -650,13 +834,25 @@ def process_tender(
     roots = [SCRIPT_DIR, input_root, output_root, work_root]
     try:
         source_hash = sha256_file(pdf)
-        if _guard_output(
+        if resume and final_path.exists() and _tender_output_can_refresh(
             final_path,
             source_hash,
-            resume=resume,
-            overwrite=overwrite,
+            project_key,
+        ) and not _existing_output_matches(
+            final_path,
+            source_hash,
             parser_schema_version=TENDER_SCHEMA_VERSION,
         ):
+            skipped = False
+        else:
+            skipped = _guard_output(
+                final_path,
+                source_hash,
+                resume=resume,
+                overwrite=overwrite,
+                parser_schema_version=TENDER_SCHEMA_VERSION,
+            )
+        if skipped:
             metadata = _read_front_matter(final_path)
             return DocumentOutcome(
                 document_type="tender",
@@ -669,7 +865,7 @@ def process_tender(
                 warnings=["命中相同源文件与流水线版本，已跳过"],
             )
 
-        work_dir = project_work / "tender" / source_hash[:10]
+        work_dir = project_work / "tender" / f"{TENDER_SCHEMA_VERSION}__{source_hash[:10]}"
         use_cached = False
         if work_dir.exists():
             if overwrite:
@@ -783,6 +979,7 @@ def process_bid(
             source_hash,
             resume=resume,
             overwrite=overwrite,
+            pipeline_version=BID_PIPELINE_VERSION,
             processing_mode=BID_PROCESSING_MODE,
         ):
             metadata = _read_front_matter(final_path)
@@ -1011,6 +1208,7 @@ def _load_profile_bid_outcomes(project_dir: Path) -> tuple[list[DocumentOutcome]
 def process_profiles_only_project(
     project_dir: Path,
     *,
+    award_registry: AwardRegistry,
     intermediate_output_root: Path,
     output_root: Path,
     work_root: Path,
@@ -1027,10 +1225,17 @@ def process_profiles_only_project(
     if not bid_outcomes:
         errors.append("output2 项目目录中没有可用的投标 Markdown")
     _ensure_markdown_only(final_project_output)
-    for outcome in bid_outcomes:
+    award_decisions, award_errors = _company_award_decisions(
+        project_key=project_key,
+        outcomes=bid_outcomes,
+        registry=award_registry,
+    )
+    errors.extend(award_errors)
+    for outcome, award_decision in zip(bid_outcomes, award_decisions):
         try:
             _generate_bid_profile(
                 outcome=outcome,
+                award_decision=award_decision,
                 project_key=project_key,
                 intermediate_project_output=project_dir,
                 final_project_output=final_project_output,
@@ -1054,6 +1259,7 @@ def process_profiles_only_project(
 def process_project(
     project: ProjectInput,
     *,
+    award_registry: AwardRegistry,
     input_root: Path,
     intermediate_output_root: Path,
     output_root: Path,
@@ -1137,6 +1343,7 @@ def process_project(
             try:
                 _publish_tender_markdown(
                     outcome=tender_outcome,
+                    project_key=project_key,
                     intermediate_project_output=project_output,
                     final_project_output=final_project_output,
                     resume=resume,
@@ -1148,10 +1355,17 @@ def process_project(
                 tender_outcome.errors.append(error)
                 errors.append(f"招标文件最终发布：{error}")
 
-        for outcome in bid_outcomes:
+        award_decisions, award_errors = _company_award_decisions(
+            project_key=project_key,
+            outcomes=bid_outcomes,
+            registry=award_registry,
+        )
+        errors.extend(award_errors)
+        for outcome, award_decision in zip(bid_outcomes, award_decisions):
             try:
                 _generate_bid_profile(
                     outcome=outcome,
+                    award_decision=award_decision,
                     project_key=project_key,
                     intermediate_project_output=project_output,
                     final_project_output=final_project_output,
@@ -1191,6 +1405,10 @@ def process_project(
 def run(args: argparse.Namespace) -> tuple[list[ProjectOutcome], int]:
     load_local_env(SCRIPT_DIR / ".env")
     deepseek_settings = DeepSeekSettings.from_env()
+    award_file = args.award_file.expanduser()
+    if not award_file.is_absolute():
+        award_file = (Path.cwd() / award_file).absolute()
+    award_registry = load_award_registry(award_file)
     raw_roots = {
         "输入根目录": args.input_root.expanduser(),
         "中间输出根目录": args.intermediate_output_root.expanduser(),
@@ -1216,6 +1434,7 @@ def run(args: argparse.Namespace) -> tuple[list[ProjectOutcome], int]:
         for project_dir in project_dirs:
             outcome = process_profiles_only_project(
                 project_dir,
+                award_registry=award_registry,
                 intermediate_output_root=intermediate_output_root,
                 output_root=output_root,
                 work_root=work_root,
@@ -1255,6 +1474,7 @@ def run(args: argparse.Namespace) -> tuple[list[ProjectOutcome], int]:
     for project in projects:
         outcome = process_project(
             project,
+            award_registry=award_registry,
             input_root=input_root,
             intermediate_output_root=intermediate_output_root,
             output_root=output_root,

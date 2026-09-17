@@ -694,23 +694,48 @@ def generate_company_profile(
                 f"项目：{project_key}\n企业：{company_name}\n"
                 f"当前为第 {index}/{len(chunks)} 个分页批次。完整抽取本批次事实，不做报告式压缩。\n\n{chunk}"
             )
-            for schema_attempt in range(2):
+            validation_error: ValueError | None = None
+            invalid_item: Any = None
+            for schema_attempt in range(3):
+                retry_guidance = ""
+                if validation_error is not None:
+                    retry_guidance = (
+                        "\n\n上一版分块结果未通过校验："
+                        + str(validation_error)
+                        + "。请重新输出完整 JSON，保留所有规定的顶层键、企业档案分类和八个能力维度。"
+                        "每条事实的 evidencePages 必须引用本批次文本中实际支持该事实的 PDF 页码；"
+                        "找不到明确证据时，不得猜测或填写无关页码，应从事实数组中去掉该条候选事实，"
+                        "并在 reviewItems 中用 issue、evidencePages: []、note 说明排除原因。"
+                    )
+                    if invalid_item is not None:
+                        retry_guidance += (
+                            "\n上一版未通过校验的候选条目（仅用于定位错误，不是新证据）："
+                            + json.dumps(invalid_item, ensure_ascii=False, separators=(",", ":"))
+                        )
                 data = client.chat_json(
                     system_prompt=system_prompt,
-                    user_prompt=(
-                        chunk_prompt
-                        if schema_attempt == 0
-                        else chunk_prompt
-                        + "\n\n上一次响应结构不完整。必须保留所有规定的 JSON 顶层键、"
-                        "企业档案分类和八个能力维度。"
-                    ),
+                    user_prompt=chunk_prompt + retry_guidance,
                 )
                 try:
                     _validate_chunk_payload(data, allowed_pages=allowed_pages)
                     break
-                except ValueError:
-                    if schema_attempt == 1:
-                        raise
+                except ValueError as exc:
+                    validation_error = exc
+                    invalid_item = None
+                    match = re.search(
+                        r"(companyFacts|capabilityDimensions)\.([a-z_]+)\[(\d+)\]",
+                        str(exc),
+                    )
+                    if match:
+                        section = data.get(match.group(1))
+                        items = section.get(match.group(2)) if isinstance(section, dict) else None
+                        item_index = int(match.group(3))
+                        if isinstance(items, list) and item_index < len(items):
+                            invalid_item = items[item_index]
+                    if schema_attempt == 2:
+                        raise ValueError(
+                            f"DeepSeek 第 {index}/{len(chunks)} 批次校验失败（已尝试 3 次）：{exc}"
+                        ) from exc
             atomic_write_json(cache_path, {
                 "sourceSha256": source_sha256,
                 "chunkSha256": chunk_sha256,
